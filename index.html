@@ -69,7 +69,7 @@
           階段 1
         </span>
         <div id="networkControl" class="hidden flex items-center gap-2 text-xs">
-          <span id="exampleSource" class="text-indigo-200 text-[10px]">內建範例</span>
+          <span id="exampleSource" class="text-indigo-200 text-[10px]">尚未更新</span>
           <span id="countdownTimer" class="font-mono font-bold text-amber-300">30:00</span>
           <button onclick="triggerNetworkUpdate()" title="更新外部韓文例句" aria-label="更新外部韓文例句" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
             <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshSpinner"></i>
@@ -218,24 +218,14 @@
       { kana: '커피를 마셔요.', romaji: 'keopireul masyeoyo', word: '커피를 마셔요.', reading: '喝咖啡', meaning: '喝咖啡' }
     ];
 
-    const backupPhase4 = [
-      { jp: '실례합니다, 이거 얼마예요?', tw: '不好意思，請問這個多少錢？', scenario: '購物結帳' },
-      { jp: '계산해주세요.', tw: '麻煩請結帳。', scenario: '餐廳點餐' },
-      { jp: '지하철역이 어디에 있어요?', tw: '請問地鐵站在哪裡？', scenario: '交通問路' },
-      { jp: '어떻게 지내세요? 덕분에 잘 지냅니다.', tw: '您好嗎？托您的福我過得很好。', scenario: '日常問候' },
-      { jp: '사진을 찍어도 돼요?', tw: '請問可以拍照嗎？', scenario: '景點觀光' },
-      { jp: '메뉴판 좀 주세요.', tw: '請給我菜單。', scenario: '餐廳點餐' }
-    ];
-
-    const backupPhase5 = [
-      { title: 'TOPIK I (1-2級) - 基礎生活對話', formula: '掌握日常高頻詞彙與基礎句型 (해요體 / 습니다體)', example: '저는 한국 문화를 좋아합니다. (我喜歡韓國文化。)' },
-      { title: 'TOPIK II (3-6級) - 中高級學術與職場應用', formula: '長篇閱讀、高級連接詞與敬語轉換', example: '환경 보호를 위해 플라스틱 사용을 줄여야 합니다. (為了保護環境，必須減少塑膠的使用。)' },
-      { title: '實況沉浸與無字幕影集練習', formula: '透過韓國綜藝與新聞訓練聽力與口語流利度', example: '들리는 대로 따라 읽는 섀도잉 연습을 합니다. (進行聽到什麼就跟著讀的影子跟讀練習。)' }
-    ];
-
-    let dynamicPhase4Data = [...backupPhase4];
-    let dynamicPhase5Data = [...backupPhase5];
-    let exampleSource = '內建範例';
+    let dynamicPhase4Data = [];
+    let dynamicPhase5Data = [];
+    let exampleSource = '尚未更新';
+    const phaseNetworkStatus = { 4: '尚未更新', 5: '尚未更新' };
+    const dailySearches = {
+      4: [{ query: '주세요', scenario: '購物與點餐' }, { query: '어디', scenario: '交通與問路' }],
+      5: [{ query: '오늘', scenario: '日常對話' }, { query: '약속', scenario: '生活安排' }]
+    };
     let updateInProgress = false;
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -281,7 +271,8 @@
       }
       const button = document.getElementById('phaseTestButton');
       if (button) {
-        button.disabled = !developerMode && studySeconds(currentPhase) < PHASE_STUDY_HOURS[currentPhase] * 3600;
+        const onlineDataMissing = currentPhase === 4 && dynamicPhase4Data.length < 4 || currentPhase === 5 && dynamicPhase5Data.length < 4;
+        button.disabled = onlineDataMissing || !developerMode && studySeconds(currentPhase) < PHASE_STUDY_HOURS[currentPhase] * 3600;
         button.classList.toggle('opacity-50', button.disabled);
       }
     }
@@ -324,7 +315,7 @@
         { id: 2, name: '階段 2', desc: '基礎單字 · 150h' },
         { id: 3, name: '階段 3', desc: '文法句型 · 300h' },
         { id: 4, name: '階段 4', desc: '實戰會話 · 400h' },
-        { id: 5, name: '階段 5', desc: 'TOPIK · 200h' },
+        { id: 5, name: '階段 5', desc: '生活對話 · 200h' },
         { id: 99, name: '錯題本', desc: '弱點' }
       ];
 
@@ -347,7 +338,7 @@
         2: '階段 2：累積基礎單字與發音習慣 · 150 小時',
         3: '階段 3：攻克基礎文法、SOV句型與敬語 · 300 小時',
         4: '階段 4：聽說讀寫全方位應用與會話 · 400 小時',
-        5: '階段 5：TOPIK 備考與綜合生活沉浸 · 200 小時',
+        5: '階段 5：生活情境與綜合對話 · 200 小時',
         99: '錯題本：個人弱點強化複習'
       };
 
@@ -355,8 +346,9 @@
       document.getElementById('phaseTitle').innerText = phaseTitles[phaseId];
 
       const netControl = document.getElementById('networkControl');
-      if (phaseId === 4) {
+      if (phaseId === 4 || phaseId === 5) {
         netControl.classList.remove('hidden');
+        document.getElementById('exampleSource').textContent = phaseNetworkStatus[phaseId];
       } else {
         netControl.classList.add('hidden');
       }
@@ -387,6 +379,31 @@
       if (tipTimer) tipTimer.textContent = `${m}:${s}`;
     }
 
+    async function fetchDailyExamples(phase) {
+      const results = await Promise.allSettled(dailySearches[phase].map(async ({ query, scenario }) => {
+        const url = new URL('https://api.tatoeba.org/v1/sentences');
+        url.searchParams.set('lang', 'kor');
+        url.searchParams.set('q', query);
+        url.searchParams.set('trans:lang', 'cmn');
+        url.searchParams.set('showtrans:lang', 'cmn');
+        url.searchParams.set('limit', '50');
+        const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const rows = Array.isArray(payload.data) ? payload.data : [];
+        return rows.map(row => {
+          const translations = Array.isArray(row.translations) ? row.translations.flat() : [];
+          const chinese = translations.find(t => t && t.lang === 'cmn' && typeof t.text === 'string');
+          return { jp: row.text, tw: chinese?.text, scenario, id: row.id };
+        }).filter(row => typeof row.jp === 'string' && typeof row.tw === 'string'
+          && row.jp.length <= 100 && row.tw.length <= 100 && /[\uac00-\ud7a3]/u.test(row.jp));
+      }));
+      const examples = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+      const unique = [...new Map(examples.map(row => [row.tw, row])).values()];
+      if (unique.length < 4) throw new Error(`階段 ${phase} 可用的線上例句不足`);
+      return unique;
+    }
+
     async function triggerNetworkUpdate() {
       if (updateInProgress) return;
       updateInProgress = true;
@@ -399,37 +416,33 @@
         if (tipSource) tipSource.textContent = '更新中';
       }
       try {
-        const url = new URL('https://api.tatoeba.org/v1/sentences');
-        url.searchParams.set('lang', 'kor');
-        url.searchParams.set('trans:lang', 'cmn');
-        url.searchParams.set('showtrans:lang', 'cmn');
-        url.searchParams.set('trans:is_direct', 'yes');
-        url.searchParams.set('limit', '30');
-        url.searchParams.set('page', String(1 + Math.floor(Math.random() * 20)));
-        const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const payload = await response.json();
-        const rows = Array.isArray(payload.data) ? payload.data : [];
-        const examples = rows.map(row => {
-          const translations = Array.isArray(row.translations) ? row.translations.flat() : [];
-          const chinese = translations.find(t => t && t.lang === 'cmn' && typeof t.text === 'string');
-          return { jp: row.text, tw: chinese?.text, scenario: 'Tatoeba 例句', id: row.id };
-        }).filter(row => typeof row.jp === 'string' && typeof row.tw === 'string' && row.jp.length <= 120 && row.tw.length <= 120 && /[\uac00-\ud7a3]/u.test(row.jp));
-        const unique = [...new Map(examples.map(row => [row.jp, row])).values()];
-        if (unique.length < 4) throw new Error('可用例句不足');
-        dynamicPhase4Data = unique;
-        exampleSource = 'Tatoeba';
+        const results = await Promise.allSettled([fetchDailyExamples(4), fetchDailyExamples(5)]);
+        if (results[0].status === 'fulfilled') {
+          dynamicPhase4Data = results[0].value;
+          phaseNetworkStatus[4] = '線上日常用語 · Tatoeba';
+        } else {
+          phaseNetworkStatus[4] = dynamicPhase4Data.length ? '更新失敗 · 顯示上次線上資料' : '網路更新失敗 · 請重試';
+          console.warn('階段 4 線上例句更新失敗：', results[0].reason);
+        }
+        if (results[1].status === 'fulfilled') {
+          dynamicPhase5Data = results[1].value;
+          phaseNetworkStatus[5] = '線上日常用語 · Tatoeba';
+        } else {
+          phaseNetworkStatus[5] = dynamicPhase5Data.length ? '更新失敗 · 顯示上次線上資料' : '網路更新失敗 · 請重試';
+          console.warn('階段 5 線上例句更新失敗：', results[1].reason);
+        }
+        if (results.every(result => result.status === 'rejected')) throw new Error('兩個階段皆無法取得例句');
+        exampleSource = results.every(result => result.status === 'fulfilled') ? '線上日常用語 · Tatoeba' : '部分更新失敗 · 請重試';
       } catch (error) {
-        dynamicPhase4Data = [...backupPhase4];
-        exampleSource = '內建範例（更新失敗）';
+        exampleSource = '網路更新失敗 · 請重試';
         console.warn('外部例句更新失敗：', error);
       } finally {
-        source.textContent = exampleSource;
+        source.textContent = currentPhase === 4 || currentPhase === 5 ? phaseNetworkStatus[currentPhase] : exampleSource;
         spinner.classList.remove('fa-spin');
         updateInProgress = false;
         timerSeconds = 1800;
         updateTimerDisplay();
-        if (currentPhase === 4) renderContent();
+        if (currentPhase === 4 || currentPhase === 5) { renderContent(); renderStudyStatus(); }
         renderStudyTip();
       }
     }
@@ -440,6 +453,11 @@
 
     function speakExample(index) {
       const item = dynamicPhase4Data[index];
+      if (item) speak(item.jp);
+    }
+
+    function speakDailyExample(phase, index) {
+      const item = (phase === 4 ? dynamicPhase4Data : dynamicPhase5Data)[index];
       if (item) speak(item.jp);
     }
 
@@ -536,14 +554,14 @@
               <span>開始階段 ${currentPhase} 模擬測驗 (20 題)</span>
             </button>
             <p class="text-xs text-slate-500 px-1">點選韓文字母可聽發音並查看個別範例</p>
-            <div id="kanaGrid" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5 sm:gap-2">
+            <div id="kanaGrid" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1">
               ${data.map((item, index) => `
-                <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看範例" class="p-2 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-16 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">
-                    <span class="text-xl sm:text-2xl font-bold text-indigo-600">${escapeHtml(item.kana)}</span>
-                    <span class="text-[10px] font-mono text-slate-400">${escapeHtml(item.romaji)}</span>
+                <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看範例" class="px-1 py-1 bg-white border border-slate-200 rounded-lg active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-12 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">
+                    <span class="text-lg font-bold text-indigo-600 leading-tight">${escapeHtml(item.kana)}</span>
+                    <span class="text-[10px] font-mono text-slate-400 leading-tight">${escapeHtml(item.romaji)}</span>
                 </button>
               `).join('')}
-              <div id="selectedExample" class="hidden bg-white border border-indigo-200 rounded-2xl p-4 shadow-sm space-y-2" style="grid-column: 1 / -1" aria-live="polite">
+              <div id="selectedExample" class="hidden bg-white border border-indigo-200 rounded-xl p-3 shadow-sm space-y-1" style="grid-column: 1 / -1" aria-live="polite">
                 <div class="flex items-center justify-between">
                   <p class="text-[11px] font-bold text-indigo-600">個別範例</p>
                   <button type="button" data-example-speak aria-label="播放範例發音" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
@@ -567,6 +585,7 @@
               <i class="fa-solid fa-pen-to-square"></i>
               <span>開始階段 4 會話測驗 (20 題)</span>
             </button>
+            ${dynamicPhase4Data.length ? '' : '<div class="bg-white border border-slate-200 rounded-xl p-4 text-xs text-slate-600">尚未取得線上日常用語。請檢查網路連線後，點選上方更新按鈕重試。</div>'}
             <div class="space-y-2">
               ${dynamicPhase4Data.map((item, index) => `
                 <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
@@ -590,19 +609,21 @@
             <p id="studyStatus" class="text-xs font-bold text-indigo-700 bg-indigo-50 rounded-xl px-3 py-2" aria-live="polite"></p>
             <button id="phaseTestButton" onclick="openTestModal(5)" class="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2">
               <i class="fa-solid fa-pen-to-square"></i>
-              <span>開始階段 5 TOPIK 與沉浸測驗 (20 題)</span>
+              <span>開始階段 5 日常用語測驗 (20 題)</span>
             </button>
+            ${dynamicPhase5Data.length ? '' : '<div class="bg-white border border-slate-200 rounded-xl p-4 text-xs text-slate-600">尚未取得線上日常用語。請檢查網路連線後，點選上方更新按鈕重試。</div>'}
             <div class="space-y-2">
-              ${dynamicPhase5Data.map(item => `
+              ${dynamicPhase5Data.map((item, index) => `
                 <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
-                  <h3 class="text-xs font-bold text-indigo-600">${item.title}</h3>
-                  <div class="p-2 bg-slate-50 border rounded-xl text-[11px] font-mono text-slate-600">${item.formula}</div>
-                  <div class="flex items-center justify-between pt-1">
-                    <p class="text-xs text-slate-700 font-medium">${item.example}</p>
-                    <button onclick="speak('${item.example}')" class="text-indigo-600 text-xs ml-2">
+                  <div class="flex items-center justify-between">
+                    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md">${escapeHtml(item.scenario)}</span>
+                    <button onclick="speakDailyExample(5, ${index})" aria-label="朗讀例句" class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs active:scale-90 transition">
                       <i class="fa-solid fa-volume-high"></i>
                     </button>
                   </div>
+                  <p class="text-sm font-bold text-slate-800 leading-snug">${escapeHtml(item.jp)}</p>
+                  <p class="text-xs text-slate-500">${escapeHtml(item.tw)}</p>
+                  <a href="https://tatoeba.org/sentences/show/${encodeURIComponent(item.id)}" target="_blank" rel="noopener noreferrer" class="text-[10px] text-indigo-600 underline">來源：Tatoeba #${escapeHtml(item.id)}</a>
                 </div>
               `).join('')}
             </div>
@@ -650,7 +671,8 @@
     }
 
     function openTestModal(phase) {
-      if (!phaseUnlocked(phase) || (!developerMode && studySeconds(phase) < PHASE_STUDY_HOURS[phase] * 3600)) return;
+      if (!phaseUnlocked(phase) || (!developerMode && studySeconds(phase) < PHASE_STUDY_HOURS[phase] * 3600)
+        || (phase === 4 && dynamicPhase4Data.length < 4) || (phase === 5 && dynamicPhase5Data.length < 4)) return;
       activeTestPhase = phase;
       const modal = document.getElementById('testModal');
       const title = document.getElementById('modalTitle');
@@ -683,16 +705,10 @@
           let wrongPool = sourcePool.filter(x => x.romaji !== correctAns).map(x => x.romaji);
           wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
           options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
-        } else if (phase === 4) {
+        } else {
           qText = `「${target.jp}」的中文意思是？`;
           correctAns = target.tw;
           let wrongPool = sourcePool.filter(x => x.tw !== correctAns).map(x => x.tw);
-          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
-          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
-        } else {
-          qText = `「${target.title}」對應的例句？`;
-          correctAns = target.example;
-          let wrongPool = backupPhase5.filter(x => x.example !== correctAns).map(x => x.example);
           wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
           options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
         }
