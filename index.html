@@ -157,6 +157,7 @@
     let testQuestions = [];
     let currentQuestionIdx = 0;
     let userScore = 0;
+    const selectedExamples = { 1: null, 2: null, 3: null };
 
     // 階段 1：韓文字母（基礎子音、母音與雙子音/複合母音）
     const phase1Data = [
@@ -461,7 +462,7 @@
       tip.classList.remove('hidden');
       const fallback = [
         { jp: '가방', tw: '書包', advice: '先認字母，再聽範例單字的發音。' },
-        { jp: '안녕하세요.', tw: '您好。', advice: '展開卡片後朗讀單字，加深記憶。' },
+        { jp: '안녕하세요.', tw: '您好。', advice: '點選字母查看範例，再朗讀單字加深記憶。' },
         { jp: '저는 학생입니다.', tw: '我是學生。', advice: '留意韓文句子中動詞通常位於句尾。' }
       ][currentPhase - 1];
       const external = exampleSource === 'Tatoeba'
@@ -485,6 +486,41 @@
       updateTimerDisplay();
     }
 
+    function selectExample(phase, index, playSound = true) {
+      selectedExamples[phase] = index;
+      const item = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase][index];
+      const panel = document.getElementById('selectedExample');
+      if (!panel) return;
+      panel.classList.remove('hidden');
+      panel.querySelector('[data-example-word]').textContent = item.word;
+      panel.querySelector('[data-example-reading]').textContent = item.reading || '';
+      panel.querySelector('[data-example-meaning]').textContent = item.meaning;
+      panel.querySelector('[data-example-speak]').onclick = () => speak(item.word);
+      placeExampleAfterRow(index);
+      document.querySelectorAll('[data-kana-index]').forEach(button => {
+        const selected = Number(button.dataset.kanaIndex) === index;
+        button.classList.toggle('ring-2', selected);
+        button.classList.toggle('ring-indigo-500', selected);
+        button.setAttribute('aria-pressed', String(selected));
+      });
+      if (playSound) speak(item.kana);
+    }
+
+    function placeExampleAfterRow(index) {
+      const grid = document.getElementById('kanaGrid');
+      const panel = document.getElementById('selectedExample');
+      if (!grid || !panel) return;
+      const cards = grid.querySelectorAll('[data-kana-index]');
+      const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+      const rowEnd = Math.min(cards.length - 1, Math.floor(index / columns) * columns + columns - 1);
+      cards[rowEnd].after(panel);
+    }
+
+    window.addEventListener('resize', () => {
+      const index = selectedExamples[currentPhase];
+      if (index !== null && index !== undefined) placeExampleAfterRow(index);
+    });
+
     function renderContent() {
       const area = document.getElementById('contentArea');
 
@@ -499,24 +535,30 @@
               <i class="fa-solid fa-pen-to-square"></i>
               <span>開始階段 ${currentPhase} 模擬測驗 (20 題)</span>
             </button>
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-start">
+            <p class="text-xs text-slate-500 px-1">點選韓文字母可聽發音並查看個別範例</p>
+            <div id="kanaGrid" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5 sm:gap-2">
               ${data.map((item, index) => `
-                <details class="group bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                  <summary class="cursor-pointer list-none p-3 flex flex-col items-center justify-center text-center min-h-24 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">
+                <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看範例" class="p-2 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-16 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">
                     <span class="text-xl sm:text-2xl font-bold text-indigo-600">${escapeHtml(item.kana)}</span>
-                    <span class="text-[11px] font-mono text-slate-500 mt-1">${escapeHtml(item.romaji)}</span>
-                    <span class="text-[10px] text-indigo-500 mt-1 group-open:hidden">點選查看範例</span>
-                  </summary>
-                  <div class="border-t border-slate-100 bg-indigo-50/50 px-3 py-2 text-center">
-                    <p class="text-sm font-bold text-slate-800">${escapeHtml(item.word)}</p>
-                    <p class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(item.reading || '')} · ${escapeHtml(item.meaning)}</p>
-                    <button type="button" onclick="speakStudyCard(${currentPhase}, ${index})" aria-label="朗讀${escapeHtml(item.word)}" class="mt-2 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[11px]">▶ 聽發音</button>
-                  </div>
-                </details>
+                    <span class="text-[10px] font-mono text-slate-400">${escapeHtml(item.romaji)}</span>
+                </button>
               `).join('')}
+              <div id="selectedExample" class="hidden bg-white border border-indigo-200 rounded-2xl p-4 shadow-sm space-y-2" style="grid-column: 1 / -1" aria-live="polite">
+                <div class="flex items-center justify-between">
+                  <p class="text-[11px] font-bold text-indigo-600">個別範例</p>
+                  <button type="button" data-example-speak aria-label="播放範例發音" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
+                </div>
+                <p data-example-word class="text-lg font-bold text-slate-800"></p>
+                <p data-example-reading class="text-xs text-slate-500"></p>
+                <p data-example-meaning class="text-xs text-slate-700"></p>
+              </div>
             </div>
           </div>
         `;
+        area.querySelectorAll('[data-kana-index]').forEach(button => {
+          button.addEventListener('click', () => selectExample(currentPhase, Number(button.dataset.kanaIndex)));
+        });
+        if (selectedExamples[currentPhase] !== null) selectExample(currentPhase, selectedExamples[currentPhase], false);
       } else if (currentPhase === 4) {
         area.innerHTML = `
           <div class="space-y-3">
