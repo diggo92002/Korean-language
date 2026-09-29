@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>韓文闖關學習系統 - 手機優化版</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 圖示 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+    body { 
+      font-family: 'Noto Sans TC', 'Noto Sans KR', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* 隱藏橫向滾動條 */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+
+  <!-- Header 導覽列 (手機優化) -->
+  <header class="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+    <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-indigo-200 shadow-md">
+          한
+        </div>
+        <div>
+          <h1 class="font-bold text-base text-slate-800 leading-none">韓文闖關學習</h1>
+          <p class="text-[10px] text-slate-400 mt-0.5">隨機測驗 & 動態錯題本</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <!-- 開發者模式按鈕 -->
+        <button id="developerButton" onclick="toggleDevModeModal()" title="開發者模式" aria-label="開啟開發者模式" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
+          <i class="fa-solid fa-code"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容區域 -->
+  <main class="max-w-5xl mx-auto px-3 py-3 flex-1 w-full space-y-3 pb-20">
+
+    <!-- 階段選擇 (手機橫向滑動卡片) -->
+    <nav class="overflow-x-auto no-scrollbar py-1">
+      <div class="flex gap-2 min-w-max px-1" id="phaseTabContainer">
+        <!-- JavaScript 動態渲染階段頁籤 -->
+      </div>
+    </nav>
+
+    <!-- 頂部資訊卡片 (狀態、計時與手動更新) -->
+    <div id="statusHeader" class="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md shadow-indigo-100 space-y-2">
+      <div class="flex items-center justify-between">
+        <span id="phaseBadge" class="px-2.5 py-0.5 bg-white/20 backdrop-blur-md text-white text-[11px] font-bold rounded-lg border border-white/20">
+          階段 1
+        </span>
+        <div id="networkControl" class="hidden flex items-center gap-2 text-xs">
+          <span id="exampleSource" class="text-indigo-200 text-[10px]">內建範例</span>
+          <span id="countdownTimer" class="font-mono font-bold text-amber-300">30:00</span>
+          <button onclick="triggerNetworkUpdate()" title="更新外部韓文例句" aria-label="更新外部韓文例句" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+            <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshSpinner"></i>
+          </button>
+        </div>
+      </div>
+      <h2 id="phaseTitle" class="text-base font-bold leading-tight">韓文字母與發音基礎練習區</h2>
+    </div>
+
+    <!-- 開發者模式選單 (Modal 形式) -->
+    <div id="devModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 hidden">
+      <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center border-b pb-2">
+          <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-amber-500"></i> 開發者測試控制台
+          </h3>
+          <button onclick="toggleDevModeModal()" class="text-slate-400 text-sm">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="grid grid-cols-1 gap-2 text-xs">
+          <p class="p-3 bg-emerald-50 text-emerald-800 rounded-xl font-bold">開發者模式已開啟：所有階段與測驗均可使用。</p>
+          <button onclick="disableDeveloperMode()" class="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-left">關閉開發者模式</button>
+          <button onclick="triggerNetworkUpdate(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
+            <span>⚡ 強制刷新網路 API 題庫</span>
+            <i class="fa-solid fa-bolt text-amber-500"></i>
+          </button>
+          <button onclick="timerSeconds=5; updateTimerDisplay(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
+            <span>⏱️ 將倒數計時縮短至 5 秒</span>
+            <i class="fa-solid fa-clock text-amber-500"></i>
+          </button>
+          <button onclick="clearWrongQuestions(); toggleDevModeModal();" class="p-3 bg-red-50 hover:bg-red-100 text-red-800 rounded-xl font-medium text-left flex items-center justify-between">
+            <span>🗑️ 清空所有錯題記錄</span>
+            <i class="fa-solid fa-trash text-red-500"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主練習內容呈現區 -->
+    <section id="contentArea" class="space-y-3">
+      <!-- 動態載入內容 -->
+    </section>
+
+    <section id="studyTip" class="hidden bg-white border border-indigo-100 rounded-2xl p-4 shadow-sm" aria-live="polite"></section>
+
+  </main>
+
+  <!-- 全螢幕測驗 Modal (手機端滿版設計) -->
+  <div id="testModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-end sm:items-center justify-center z-50 hidden">
+    <div class="bg-white w-full max-w-md h-[92vh] sm:h-auto sm:max-h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <!-- Modal Header -->
+      <div class="bg-slate-900 text-white px-5 py-3.5 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-graduation-cap text-indigo-400"></i>
+          <h3 class="font-bold text-sm" id="modalTitle">階段測驗</h3>
+        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <!-- Modal Body -->
+      <div class="p-5 overflow-y-auto flex-1 space-y-4" id="modalBody">
+        <!-- 測驗內容動態渲染 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-3 text-center text-[11px] text-slate-400 fixed bottom-0 left-0 right-0 z-30">
+    <p>韓文闖關學習系統 &copy; 2026 | 手機版優化</p>
+  </footer>
+
+  <!-- JavaScript 邏輯程式碼 -->
+  <script>
+    let currentPhase = 1;
+    let timerSeconds = 1800;
+    const PHASE_STUDY_HOURS = { 1: 30, 2: 150, 3: 300, 4: 400, 5: 200 };
+    const PROGRESS_KEY = 'kr_app_phase_progress_v2';
+    let progress = loadProgress();
+    let developerMode = false;
+    let activeTestPhase = null;
+    let timerInterval = null;
+
+    let testQuestions = [];
+    let currentQuestionIdx = 0;
+    let userScore = 0;
+
+    // 階段 1：韓文字母（基礎子音、母音與雙子音/複合母音）
+    const phase1Data = [
+      { kana: 'ㄱ', romaji: 'g / k', word: '가방', reading: 'gabang', meaning: '書包' },
+      { kana: 'ㄴ', romaji: 'n', word: '나무', reading: 'namu', meaning: '樹木' },
+      { kana: 'ㄷ', romaji: 'd / t', word: '다리', reading: 'dari', meaning: '橋 / 腿' },
+      { kana: 'ㄹ', romaji: 'r / l', word: '라면', reading: 'ramyeon', meaning: '拉麵' },
+      { kana: 'ㅁ', romaji: 'm', word: '모자', reading: 'moja', meaning: '帽子' },
+      { kana: 'ㅂ', romaji: 'b / p', word: '바다', reading: 'bada', meaning: '大海' },
+      { kana: 'ㅅ', romaji: 's', word: '사과', reading: 'sagwa', meaning: '蘋果' },
+      { kana: 'ㅇ', romaji: 'ng / 靜音', word: '아이', reading: 'ai', meaning: '小孩' },
+      { kana: 'ㅈ', romaji: 'j', word: '자전거', reading: 'jajeongeo', meaning: '腳踏車' },
+      { kana: 'ㅊ', romaji: 'ch', word: '친구', reading: 'chingu', meaning: '朋友' },
+      { kana: 'ㅋ', romaji: 'k', word: '카드', reading: 'kadeu', meaning: '卡片' },
+      { kana: 'ㅌ', romaji: 't', word: '토마토', reading: 'tomato', meaning: '番茄' },
+      { kana: 'ㅍ', romaji: 'p', word: '포도', reading: 'podo', meaning: '葡萄' },
+      { kana: 'ㅎ', romaji: 'h', word: '학교', reading: 'hakgyo', meaning: '學校' },
+      { kana: 'ㅏ', romaji: 'a', word: '아이', reading: 'ai', meaning: '孩子' },
+      { kana: 'ㅓ', romaji: 'eo', word: '어머니', reading: 'eomeoni', meaning: '母親' },
+      { kana: 'ㅗ', romaji: 'o', word: '오이', reading: 'oi', meaning: '黃瓜' },
+      { kana: 'ㅜ', romaji: 'u', word: '우유', reading: 'uyu', meaning: '牛奶' },
+      { kana: 'ㅡ', romaji: 'eu', word: 'ㅡ', reading: 'ㅡ', meaning: '閉母音' },
+      { kana: 'ㅣ', romaji: 'i', word: '이름', reading: 'ireum', meaning: '名字' },
+      { kana: 'ㄲ', romaji: 'kk', word: '토끼', reading: 'tokki', meaning: '兔子' },
+      { kana: 'ㄸ', romaji: 'tt', word: '딸기', reading: 'ttalgi', meaning: '草莓' },
+      { kana: 'ㅃ', romaji: 'pp', word: '뿌리', reading: 'ppuri', meaning: '根部' },
+      { kana: 'ㅆ', romaji: 'ss', word: '쓰다', reading: 'sseuda', meaning: '寫 / 苦' }
+    ];
+
+    // 階段 2：基礎生活單字與發音習慣
+    const phase2Data = [
+      { kana: '안녕하세요', romaji: 'annyeonghaseyo', word: '안녕하세요', reading: '안녕하세요', meaning: '您好 (禮貌體)' },
+      { kana: '감사합니다', romaji: 'gamsahamnida', word: '감사합니다', reading: '감사합니다', meaning: '謝謝 (正式)' },
+      { kana: '물', romaji: 'mul', word: '물', reading: 'mul', meaning: '水' },
+      { kana: '밥', romaji: 'bap', word: '밥', reading: 'bap', meaning: '飯 / 食物' },
+      { kana: '집', romaji: 'jip', word: '집', reading: 'jip', meaning: '家' },
+      { kana: '친구', romaji: 'chingu', word: '친구', reading: 'chingu', meaning: '朋友' },
+      { kana: '오늘', romaji: 'oneul', word: '오늘', reading: 'oneul', meaning: '今天' },
+      { kana: '내일', romaji: 'naeil', word: '내일', reading: 'naeil', meaning: '明天' },
+      { kana: '시간', romaji: 'sigan', word: '시간', reading: 'sigan', meaning: '時間' },
+      { kana: '돈', romaji: 'don', word: '돈', reading: 'don', meaning: '錢' },
+      { kana: '차', romaji: 'cha', word: '차', reading: 'cha', meaning: '車 / 茶' },
+      { kana: '책', romaji: 'chaek', word: '책', reading: 'chaek', meaning: '書本' },
+      { kana: '컴퓨터', romaji: 'keompyuteo', word: '컴퓨터', reading: 'keompyuteo', meaning: '電腦' },
+      { kana: '커피', romaji: 'keopi', word: '커피', reading: 'keopi', meaning: '咖啡' },
+      { kana: '날씨', romaji: 'nalssi', word: '날씨', reading: 'nalssi', meaning: '天氣' }
+    ];
+
+    // 階段 3：基礎文法、語序與敬語系統 (SOV、해요體)
+    const phase3Data = [
+      { kana: '저는 학생입니다.', romaji: 'jeoneun haksaengimnida', word: '저는 학생입니다.', reading: '學生', meaning: '我是學生 (正式)' },
+      { kana: '이것은 뭐예요?', romaji: 'igeoseun mwoyeyo?', word: '이것은 뭐예요?', reading: '什麼', meaning: '這個是什麼？' },
+      { kana: '사과를 먹어요.', romaji: 'sagwareul meogeoyo', word: '사과를 먹어요.', reading: '吃蘋果', meaning: '吃蘋果 (해요體)' },
+      { kana: '한국어를 공부해요.', romaji: 'hanguk-eureul gongbuhaeyo', word: '한국어를 공부해요.', reading: '學韓文', meaning: '學習韓文' },
+      { kana: '어디에 가요?', romaji: 'eodie gayo?', word: '어디에 가요?', reading: '去哪裡', meaning: '你要去哪裡？' },
+      { kana: '주말에 쉬어요.', romaji: 'jumare swieoyo', word: '주말에 쉬어요.', reading: '週末休息', meaning: '週末休息' },
+      { kana: '영화를 봐요.', romaji: 'yeonghwareul bwayo', word: '영화를 봐요.', reading: '看電影', meaning: '看電影' },
+      { kana: '커피를 마셔요.', romaji: 'keopireul masyeoyo', word: '커피를 마셔요.', reading: '喝咖啡', meaning: '喝咖啡' }
+    ];
+
+    const backupPhase4 = [
+      { jp: '실례합니다, 이거 얼마예요?', tw: '不好意思，請問這個多少錢？', scenario: '購物結帳' },
+      { jp: '계산해주세요.', tw: '麻煩請結帳。', scenario: '餐廳點餐' },
+      { jp: '지하철역이 어디에 있어요?', tw: '請問地鐵站在哪裡？', scenario: '交通問路' },
+      { jp: '어떻게 지내세요? 덕분에 잘 지냅니다.', tw: '您好嗎？托您的福我過得很好。', scenario: '日常問候' },
+      { jp: '사진을 찍어도 돼요?', tw: '請問可以拍照嗎？', scenario: '景點觀光' },
+      { jp: '메뉴판 좀 주세요.', tw: '請給我菜單。', scenario: '餐廳點餐' }
+    ];
+
+    const backupPhase5 = [
+      { title: 'TOPIK I (1-2級) - 基礎生活對話', formula: '掌握日常高頻詞彙與基礎句型 (해요體 / 습니다體)', example: '저는 한국 문화를 좋아합니다. (我喜歡韓國文化。)' },
+      { title: 'TOPIK II (3-6級) - 中高級學術與職場應用', formula: '長篇閱讀、高級連接詞與敬語轉換', example: '환경 보호를 위해 플라스틱 사용을 줄여야 합니다. (為了保護環境，必須減少塑膠的使用。)' },
+      { title: '實況沉浸與無字幕影集練習', formula: '透過韓國綜藝與新聞訓練聽力與口語流利度', example: '들리는 대로 따라 읽는 섀도잉 연습을 합니다. (進行聽到什麼就跟著讀的影子跟讀練習。)' }
+    ];
+
+    let dynamicPhase4Data = [...backupPhase4];
+    let dynamicPhase5Data = [...backupPhase5];
+    let exampleSource = '內建範例';
+    let updateInProgress = false;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderTabs();
+      switchPhase(1);
+      startCountdownTimer();
+      startStudyTimer();
+      triggerNetworkUpdate();
+    });
+
+    function loadProgress() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+        return { seconds: saved.seconds || {}, passed: saved.passed || {} };
+      } catch (_) {
+        return { seconds: {}, passed: {} };
+      }
+    }
+
+    function saveProgress() {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    }
+
+    function phaseUnlocked(phase) {
+      return developerMode || phase === 1 || phase === 99 || (phase >= 2 && phase <= 5 && !!progress.passed[phase - 1]);
+    }
+
+    function studySeconds(phase) {
+      return Math.min(PHASE_STUDY_HOURS[phase] * 3600, Number(progress.seconds[phase]) || 0);
+    }
+
+    function renderStudyStatus() {
+      const status = document.getElementById('studyStatus');
+      if (status && currentPhase !== 99) {
+        const required = PHASE_STUDY_HOURS[currentPhase] * 3600;
+        const studied = studySeconds(currentPhase);
+        const remaining = Math.max(0, required - studied);
+        const remainingMinutes = Math.ceil(remaining / 60);
+        const studiedHours = Math.floor(studied / 3600);
+        const studiedMinutes = Math.floor((studied % 3600) / 60);
+        status.textContent = `已學習 ${studiedHours} 小時 ${studiedMinutes} 分鐘／目標 ${PHASE_STUDY_HOURS[currentPhase]} 小時 · ` +
+          (developerMode ? '開發者模式：可立即考試' : progress.passed[currentPhase] ? '已通過測驗' : remaining ? `還需 ${Math.floor(remainingMinutes / 60)} 小時 ${remainingMinutes % 60} 分鐘才能考試` : '可參加測驗 · 通過分數 85 分');
+      }
+      const button = document.getElementById('phaseTestButton');
+      if (button) {
+        button.disabled = !developerMode && studySeconds(currentPhase) < PHASE_STUDY_HOURS[currentPhase] * 3600;
+        button.classList.toggle('opacity-50', button.disabled);
+      }
+    }
+
+    function startStudyTimer() {
+      let lastTick = Date.now();
+      setInterval(() => {
+        const now = Date.now();
+        const elapsed = Math.min(2, Math.max(0, (now - lastTick) / 1000));
+        lastTick = now;
+        if (document.hidden || currentPhase === 99 || !phaseUnlocked(currentPhase) || studySeconds(currentPhase) >= PHASE_STUDY_HOURS[currentPhase] * 3600 || !document.getElementById('testModal').classList.contains('hidden')) return;
+        progress.seconds[currentPhase] = studySeconds(currentPhase) + elapsed;
+        saveProgress();
+        renderStudyStatus();
+      }, 1000);
+    }
+
+    function toggleDevModeModal() {
+      const modal = document.getElementById('devModal');
+      if (modal.classList.contains('hidden')) {
+        developerMode = true;
+        document.getElementById('developerButton').classList.add('bg-emerald-100', 'text-emerald-700');
+        renderTabs();
+        renderStudyStatus();
+      }
+      modal.classList.toggle('hidden');
+    }
+
+    function disableDeveloperMode() {
+      developerMode = false;
+      document.getElementById('developerButton').classList.remove('bg-emerald-100', 'text-emerald-700');
+      document.getElementById('devModal').classList.add('hidden');
+      if (!phaseUnlocked(currentPhase)) switchPhase(1);
+      else { renderTabs(); renderStudyStatus(); }
+    }
+
+    function renderTabs() {
+      const tabs = [
+        { id: 1, name: '階段 1', desc: '字母發音 · 30h' },
+        { id: 2, name: '階段 2', desc: '基礎單字 · 150h' },
+        { id: 3, name: '階段 3', desc: '文法句型 · 300h' },
+        { id: 4, name: '階段 4', desc: '實戰會話 · 400h' },
+        { id: 5, name: '階段 5', desc: 'TOPIK · 200h' },
+        { id: 99, name: '錯題本', desc: '弱點' }
+      ];
+
+      const container = document.getElementById('phaseTabContainer');
+      container.innerHTML = tabs.map(tab => `
+        <button onclick="switchPhase(${tab.id})" ${phaseUnlocked(tab.id) ? '' : 'disabled title="請先通過前一階段測驗"'} class="px-3 py-2 rounded-xl flex flex-col items-center justify-center transition ${!phaseUnlocked(tab.id) ? 'opacity-45 cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200' : tab.id === currentPhase ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 font-bold' : 'bg-white text-slate-600 border border-slate-200'}">
+          <span class="text-xs font-bold leading-none">${tab.name}</span>
+          <span class="text-[9px] opacity-75 mt-1">${tab.desc}</span>
+        </button>
+      `).join('');
+    }
+
+    function switchPhase(phaseId) {
+      if (!phaseUnlocked(phaseId)) return;
+      currentPhase = phaseId;
+      renderTabs();
+
+      const phaseTitles = {
+        1: '階段 1：掌握韓文字母與發音規則 · 30 小時',
+        2: '階段 2：累積基礎單字與發音習慣 · 150 小時',
+        3: '階段 3：攻克基礎文法、SOV句型與敬語 · 300 小時',
+        4: '階段 4：聽說讀寫全方位應用與會話 · 400 小時',
+        5: '階段 5：TOPIK 備考與綜合生活沉浸 · 200 小時',
+        99: '錯題本：個人弱點強化複習'
+      };
+
+      document.getElementById('phaseBadge').innerText = phaseId === 99 ? '弱點' : `階段 ${phaseId}`;
+      document.getElementById('phaseTitle').innerText = phaseTitles[phaseId];
+
+      const netControl = document.getElementById('networkControl');
+      if (phaseId === 4) {
+        netControl.classList.remove('hidden');
+      } else {
+        netControl.classList.add('hidden');
+      }
+
+      renderContent();
+      renderStudyStatus();
+      renderStudyTip();
+    }
+
+    function startCountdownTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timerSeconds--;
+        if (timerSeconds <= 0) {
+          timerSeconds = 1800;
+          triggerNetworkUpdate();
+        }
+        updateTimerDisplay();
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+      const s = (timerSeconds % 60).toString().padStart(2, '0');
+      const timerEl = document.getElementById('countdownTimer');
+      if (timerEl) timerEl.innerText = `${m}:${s}`;
+      const tipTimer = document.getElementById('tipCountdown');
+      if (tipTimer) tipTimer.textContent = `${m}:${s}`;
+    }
+
+    async function triggerNetworkUpdate() {
+      if (updateInProgress) return;
+      updateInProgress = true;
+      const spinner = document.getElementById('refreshSpinner');
+      const source = document.getElementById('exampleSource');
+      spinner.classList.add('fa-spin');
+      source.textContent = '更新中';
+      if (currentPhase <= 3) {
+        const tipSource = document.querySelector('#studyTip .text-slate-500 span');
+        if (tipSource) tipSource.textContent = '更新中';
+      }
+      try {
+        const url = new URL('https://api.tatoeba.org/v1/sentences');
+        url.searchParams.set('lang', 'kor');
+        url.searchParams.set('trans:lang', 'cmn');
+        url.searchParams.set('showtrans:lang', 'cmn');
+        url.searchParams.set('trans:is_direct', 'yes');
+        url.searchParams.set('limit', '30');
+        url.searchParams.set('page', String(1 + Math.floor(Math.random() * 20)));
+        const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const rows = Array.isArray(payload.data) ? payload.data : [];
+        const examples = rows.map(row => {
+          const translations = Array.isArray(row.translations) ? row.translations.flat() : [];
+          const chinese = translations.find(t => t && t.lang === 'cmn' && typeof t.text === 'string');
+          return { jp: row.text, tw: chinese?.text, scenario: 'Tatoeba 例句', id: row.id };
+        }).filter(row => typeof row.jp === 'string' && typeof row.tw === 'string' && row.jp.length <= 120 && row.tw.length <= 120 && /[\uac00-\ud7a3]/u.test(row.jp));
+        const unique = [...new Map(examples.map(row => [row.jp, row])).values()];
+        if (unique.length < 4) throw new Error('可用例句不足');
+        dynamicPhase4Data = unique;
+        exampleSource = 'Tatoeba';
+      } catch (error) {
+        dynamicPhase4Data = [...backupPhase4];
+        exampleSource = '內建範例（更新失敗）';
+        console.warn('外部例句更新失敗：', error);
+      } finally {
+        source.textContent = exampleSource;
+        spinner.classList.remove('fa-spin');
+        updateInProgress = false;
+        timerSeconds = 1800;
+        updateTimerDisplay();
+        if (currentPhase === 4) renderContent();
+        renderStudyTip();
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+
+    function speakExample(index) {
+      const item = dynamicPhase4Data[index];
+      if (item) speak(item.jp);
+    }
+
+    function speakWrongQuestion(index) {
+      const item = getStoredWrongQuestions()[index];
+      if (item) speak(item.question);
+    }
+
+    function speakStudyCard(phase, index) {
+      const data = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase];
+      if (data?.[index]) speak(data[index].word);
+    }
+
+    function renderStudyTip() {
+      const tip = document.getElementById('studyTip');
+      if (currentPhase > 3) {
+        tip.classList.add('hidden');
+        return;
+      }
+      tip.classList.remove('hidden');
+      const fallback = [
+        { jp: '가방', tw: '書包', advice: '先認字母，再聽範例單字的發音。' },
+        { jp: '안녕하세요.', tw: '您好。', advice: '展開卡片後朗讀單字，加深記憶。' },
+        { jp: '저는 학생입니다.', tw: '我是學生。', advice: '留意韓文句子中動詞通常位於句尾。' }
+      ][currentPhase - 1];
+      const external = exampleSource === 'Tatoeba'
+        ? dynamicPhase4Data.find(item => item.jp.length <= 60 && item.tw.length <= 60)
+        : null;
+      const item = external || fallback;
+      tip.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <h3 class="text-sm font-bold text-indigo-700">練習提示</h3>
+          <div class="flex items-center gap-2 text-[11px] text-slate-500">
+            <span>${escapeHtml(exampleSource)}</span>
+            <span id="tipCountdown" class="font-mono">30:00</span>
+            <button type="button" onclick="triggerNetworkUpdate()" class="text-indigo-600 font-bold underline">立即更新</button>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">${escapeHtml(fallback.advice)}</p>
+        <p class="text-sm font-bold text-slate-800">${escapeHtml(item.jp)}</p>
+        <p class="text-xs text-slate-600 mt-1">${escapeHtml(item.tw)}</p>
+        ${external?.id ? `<a href="https://tatoeba.org/sentences/show/${encodeURIComponent(external.id)}" target="_blank" rel="noopener noreferrer" class="text-[10px] text-indigo-600 underline mt-2 inline-block">來源：Tatoeba #${escapeHtml(external.id)}</a>` : ''}
+      `;
+      updateTimerDisplay();
+    }
+
+    function renderContent() {
+      const area = document.getElementById('contentArea');
+
+      if (currentPhase <= 3) {
+        const dataMap = { 1: phase1Data, 2: phase2Data, 3: phase3Data };
+        const data = dataMap[currentPhase];
+        
+        area.innerHTML = `
+          <div class="space-y-3">
+            <p id="studyStatus" class="text-xs font-bold text-indigo-700 bg-indigo-50 rounded-xl px-3 py-2" aria-live="polite"></p>
+            <button id="phaseTestButton" onclick="openTestModal(${currentPhase})" class="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>開始階段 ${currentPhase} 模擬測驗 (20 題)</span>
+            </button>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-start">
+              ${data.map((item, index) => `
+                <details class="group bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                  <summary class="cursor-pointer list-none p-3 flex flex-col items-center justify-center text-center min-h-24 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">
+                    <span class="text-xl sm:text-2xl font-bold text-indigo-600">${escapeHtml(item.kana)}</span>
+                    <span class="text-[11px] font-mono text-slate-500 mt-1">${escapeHtml(item.romaji)}</span>
+                    <span class="text-[10px] text-indigo-500 mt-1 group-open:hidden">點選查看範例</span>
+                  </summary>
+                  <div class="border-t border-slate-100 bg-indigo-50/50 px-3 py-2 text-center">
+                    <p class="text-sm font-bold text-slate-800">${escapeHtml(item.word)}</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(item.reading || '')} · ${escapeHtml(item.meaning)}</p>
+                    <button type="button" onclick="speakStudyCard(${currentPhase}, ${index})" aria-label="朗讀${escapeHtml(item.word)}" class="mt-2 px-2 py-1 rounded-lg bg-indigo-600 text-white text-[11px]">▶ 聽發音</button>
+                  </div>
+                </details>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (currentPhase === 4) {
+        area.innerHTML = `
+          <div class="space-y-3">
+            <p id="studyStatus" class="text-xs font-bold text-indigo-700 bg-indigo-50 rounded-xl px-3 py-2" aria-live="polite"></p>
+            <button id="phaseTestButton" onclick="openTestModal(4)" class="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>開始階段 4 會話測驗 (20 題)</span>
+            </button>
+            <div class="space-y-2">
+              ${dynamicPhase4Data.map((item, index) => `
+                <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md">${escapeHtml(item.scenario || '會話')}</span>
+                    <button onclick="speakExample(${index})" aria-label="朗讀例句" class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs active:scale-90 transition">
+                      <i class="fa-solid fa-volume-high"></i>
+                    </button>
+                  </div>
+                  <p class="text-sm font-bold text-slate-800 leading-snug">${escapeHtml(item.jp)}</p>
+                  <p class="text-xs text-slate-500">${escapeHtml(item.tw)}</p>
+                  ${item.id ? `<a href="https://tatoeba.org/sentences/show/${encodeURIComponent(item.id)}" target="_blank" rel="noopener noreferrer" class="text-[10px] text-indigo-600 underline">來源：Tatoeba #${escapeHtml(item.id)}</a>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (currentPhase === 5) {
+        area.innerHTML = `
+          <div class="space-y-3">
+            <p id="studyStatus" class="text-xs font-bold text-indigo-700 bg-indigo-50 rounded-xl px-3 py-2" aria-live="polite"></p>
+            <button id="phaseTestButton" onclick="openTestModal(5)" class="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>開始階段 5 TOPIK 與沉浸測驗 (20 題)</span>
+            </button>
+            <div class="space-y-2">
+              ${dynamicPhase5Data.map(item => `
+                <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
+                  <h3 class="text-xs font-bold text-indigo-600">${item.title}</h3>
+                  <div class="p-2 bg-slate-50 border rounded-xl text-[11px] font-mono text-slate-600">${item.formula}</div>
+                  <div class="flex items-center justify-between pt-1">
+                    <p class="text-xs text-slate-700 font-medium">${item.example}</p>
+                    <button onclick="speak('${item.example}')" class="text-indigo-600 text-xs ml-2">
+                      <i class="fa-solid fa-volume-high"></i>
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (currentPhase === 99) {
+        const wrongList = getStoredWrongQuestions();
+        if (wrongList.length === 0) {
+          area.innerHTML = `
+            <div class="text-center py-12 bg-white rounded-2xl border border-slate-200 p-6 space-y-2 shadow-xs">
+              <i class="fa-solid fa-circle-check text-4xl text-emerald-500"></i>
+              <h3 class="text-sm font-bold text-slate-800">目前沒有錯題！</h3>
+              <p class="text-xs text-slate-400">進行階段測驗時答錯的題目會自動記錄於此。</p>
+            </div>
+          `;
+        } else {
+          area.innerHTML = `
+            <div class="space-y-3">
+              <div class="flex items-center justify-between px-1">
+                <span class="text-xs text-slate-500 font-medium">共累積 ${wrongList.length} 題錯題</span>
+                <button onclick="clearWrongQuestions()" class="text-xs text-red-600 font-bold hover:underline">全部清空</button>
+              </div>
+              <div class="space-y-2">
+                ${wrongList.map((item, index) => `
+                  <div class="p-3 bg-red-50/60 border border-red-100 rounded-2xl flex items-center justify-between gap-2 shadow-xs">
+                    <div class="space-y-0.5 flex-1 min-w-0">
+                      <span class="text-[10px] text-red-500 font-bold block truncate">${escapeHtml(item.question)}</span>
+                      <p class="text-xs font-bold text-slate-800 truncate">正確答案：${escapeHtml(item.correctAnswer)}</p>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button onclick="speakWrongQuestion(${index})" aria-label="朗讀錯題" class="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center text-xs active:scale-90 transition">
+                        <i class="fa-solid fa-volume-high"></i>
+                      </button>
+                      <button onclick="removeSingleWrongQuestion(${index})" class="w-7 h-7 rounded-full bg-white text-slate-400 border border-slate-200 hover:text-red-500 flex items-center justify-center text-xs active:scale-90 transition" title="移除此題">
+                        <i class="fa-solid fa-trash-can"></i>
+                      </button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
+      }
+    }
+
+    function openTestModal(phase) {
+      if (!phaseUnlocked(phase) || (!developerMode && studySeconds(phase) < PHASE_STUDY_HOURS[phase] * 3600)) return;
+      activeTestPhase = phase;
+      const modal = document.getElementById('testModal');
+      const title = document.getElementById('modalTitle');
+      title.innerText = `階段 ${phase} 模擬測驗 (20 題)`;
+      
+      testQuestions = generate20Questions(phase);
+      currentQuestionIdx = 0;
+      userScore = 0;
+
+      renderTestQuestion();
+      modal.classList.remove('hidden');
+    }
+
+    function generate20Questions(phase) {
+      let sourcePool = [];
+      if (phase === 1) sourcePool = phase1Data;
+      else if (phase === 2) sourcePool = phase2Data;
+      else if (phase === 3) sourcePool = phase3Data;
+      else if (phase === 4) sourcePool = dynamicPhase4Data;
+      else if (phase === 5) sourcePool = dynamicPhase5Data;
+
+      let questions = [];
+      for (let i = 0; i < 20; i++) {
+        const target = sourcePool[Math.floor(Math.random() * sourcePool.length)];
+        let qText = '', correctAns = '', options = [];
+
+        if (phase <= 3) {
+          qText = `「${target.kana}」的羅馬拼音或對應單字是？`;
+          correctAns = target.romaji;
+          let wrongPool = sourcePool.filter(x => x.romaji !== correctAns).map(x => x.romaji);
+          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
+          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+        } else if (phase === 4) {
+          qText = `「${target.jp}」的中文意思是？`;
+          correctAns = target.tw;
+          let wrongPool = sourcePool.filter(x => x.tw !== correctAns).map(x => x.tw);
+          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
+          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+        } else {
+          qText = `「${target.title}」對應的例句？`;
+          correctAns = target.example;
+          let wrongPool = backupPhase5.filter(x => x.example !== correctAns).map(x => x.example);
+          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
+          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+        }
+
+        questions.push({ qText, correctAns, options });
+      }
+      return questions;
+    }
+
+    function renderTestQuestion() {
+      const body = document.getElementById('modalBody');
+      const q = testQuestions[currentQuestionIdx];
+
+      body.innerHTML = `
+        <div class="space-y-4">
+          <!-- 進度條 -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] font-bold text-slate-400">
+              <span>進度：${currentQuestionIdx + 1} / 20</span>
+              <span>得分：${userScore}</span>
+            </div>
+            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+              <div class="bg-indigo-600 h-full transition-all duration-300" style="width: ${((currentQuestionIdx + 1) / 20) * 100}%"></div>
+            </div>
+          </div>
+
+          <!-- 題目卡片 -->
+          <div class="py-2">
+            <h4 class="text-base font-bold text-slate-800 leading-snug">${escapeHtml(q.qText)}</h4>
+          </div>
+
+          <!-- 選項按鈕 -->
+          <div class="space-y-2 pt-1">
+            ${q.options.map((opt, index) => `
+              <button onclick="handleAnswer(testQuestions[currentQuestionIdx].options[${index}])" class="w-full p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 text-left transition active:scale-98 flex items-center justify-between">
+                <span>${escapeHtml(opt)}</span>
+                <i class="fa-regular fa-circle text-slate-300"></i>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function handleAnswer(selectedOpt) {
+      const q = testQuestions[currentQuestionIdx];
+      if (selectedOpt === q.correctAns) {
+        userScore += 5;
+      } else {
+        saveWrongQuestion({
+          question: q.qText,
+          correctAnswer: q.correctAns
+        });
+      }
+
+      currentQuestionIdx++;
+      if (currentQuestionIdx < 20) {
+        renderTestQuestion();
+      } else {
+        renderFinalResult();
+      }
+    }
+
+    function renderFinalResult() {
+      const body = document.getElementById('modalBody');
+      const isPassed = userScore >= 85;
+      if (isPassed && activeTestPhase) {
+        progress.passed[activeTestPhase] = true;
+        saveProgress();
+        renderTabs();
+      }
+
+      body.innerHTML = `
+        <div class="text-center py-6 space-y-4">
+          <div class="w-16 h-16 ${isPassed ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'} rounded-full flex items-center justify-center text-3xl mx-auto shadow-md">
+            <i class="fa-solid ${isPassed ? 'fa-trophy' : 'fa-circle-xmark'}"></i>
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-xl font-bold text-slate-800">總得分：${userScore} 分</h3>
+            <p class="text-xs text-slate-500">${isPassed ? '🎉 恭喜通過測驗！' : '💪 答錯的題目已存入「錯題本」。'}</p>
+          </div>
+          <div class="pt-2 space-y-2">
+            <button onclick="closeModal()" class="w-full py-3 bg-slate-800 text-white rounded-2xl text-xs font-bold transition">
+              返回練習區
+            </button>
+            <button onclick="switchPhase(99); closeModal();" class="w-full py-3 bg-red-600 text-white rounded-2xl text-xs font-bold transition">
+              查看錯題本
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function getStoredWrongQuestions() {
+      return JSON.parse(localStorage.getItem('kr_app_wrong_questions') || '[]');
+    }
+
+    function saveWrongQuestion(item) {
+      let list = getStoredWrongQuestions();
+      if (!list.some(x => x.question === item.question)) {
+        list.push(item);
+        localStorage.setItem('kr_app_wrong_questions', JSON.stringify(list));
+      }
+    }
+
+    function removeSingleWrongQuestion(index) {
+      let list = getStoredWrongQuestions();
+      list.splice(index, 1);
+      localStorage.setItem('kr_app_wrong_questions', JSON.stringify(list));
+      if (currentPhase === 99) renderContent();
+    }
+
+    function clearWrongQuestions() {
+      localStorage.removeItem('kr_app_wrong_questions');
+      if (currentPhase === 99) renderContent();
+    }
+
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ko-KR';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('testModal').classList.add('hidden');
+      activeTestPhase = null;
+      renderStudyStatus();
+    }
+  </script>
+</body>
+</html>

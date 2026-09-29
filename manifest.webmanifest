@@ -1,0 +1,14 @@
+{
+  "name": "韓文闖關學習系統",
+  "short_name": "韓文學習",
+  "description": "韓文字母、單字、會話與 TOPIK 練習",
+  "lang": "zh-TW",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
