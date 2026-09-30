@@ -45,8 +45,11 @@
       
       <div class="flex items-center gap-2">
         <!-- 開發者模式按鈕 -->
-        <button id="developerButton" onclick="toggleDevModeModal()" title="開發者模式" aria-label="開啟開發者模式" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
+        <button id="developerButton" onclick="toggleDeveloperMode()" title="切換開發者模式" aria-label="切換開發者模式" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition border border-transparent">
           <i class="fa-solid fa-code"></i>
+        </button>
+        <button onclick="toggleDevModeModal()" title="設定" aria-label="設定" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
+          <i class="fa-solid fa-gear"></i>
         </button>
       </div>
     </div>
@@ -86,22 +89,22 @@
           <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
             <i class="fa-solid fa-sliders text-amber-500"></i> 開發者測試控制台
           </h3>
-          <button onclick="toggleDevModeModal()" class="text-slate-400 text-sm">
+          <button onclick="closeDevModeModal()" class="text-slate-400 text-sm">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
         <div class="grid grid-cols-1 gap-2 text-xs">
-          <p class="p-3 bg-emerald-50 text-emerald-800 rounded-xl font-bold">開發者模式已開啟：所有階段與測驗均可使用。</p>
-          <button onclick="disableDeveloperMode()" class="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-left">關閉開發者模式</button>
-          <button onclick="triggerNetworkUpdate(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
+          <p id="developerModeStatus" class="p-3 bg-slate-100 text-slate-700 rounded-xl font-bold">目前開發者模式：關閉</p>
+          <button id="developerModeToggle" onclick="toggleDeveloperMode()" class="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-left">切換開發者模式開關</button>
+          <button onclick="triggerNetworkUpdate(); closeDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
             <span>⚡ 強制刷新網路 API 題庫</span>
             <i class="fa-solid fa-bolt text-amber-500"></i>
           </button>
-          <button onclick="timerSeconds=5; updateTimerDisplay(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
+          <button onclick="timerSeconds=5; updateTimerDisplay(); closeDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
             <span>⏱️ 將倒數計時縮短至 5 秒</span>
             <i class="fa-solid fa-clock text-amber-500"></i>
           </button>
-          <button onclick="clearWrongQuestions(); toggleDevModeModal();" class="p-3 bg-red-50 hover:bg-red-100 text-red-800 rounded-xl font-medium text-left flex items-center justify-between">
+          <button onclick="clearWrongQuestions(); closeDevModeModal();" class="p-3 bg-red-50 hover:bg-red-100 text-red-800 rounded-xl font-medium text-left flex items-center justify-between">
             <span>🗑️ 清空所有錯題記錄</span>
             <i class="fa-solid fa-trash text-red-500"></i>
           </button>
@@ -241,13 +244,14 @@
     let exampleSource = '尚未更新';
     const phaseNetworkStatus = { 4: '尚未更新', 5: '尚未更新' };
     const phaseNetworkError = { 4: '', 5: '' };
+    const hasLoadedOnlineContent = { 4: false, 5: false };
+    const phaseUpdateInProgress = { 4: false, 5: false };
     const dailySearches = {
       2: [{ query: '감사합니다', scenario: '日常問候' }, { query: '어디', scenario: '常用問句' }],
       3: [{ query: '때문에', scenario: '原因句型' }, { query: '하지만', scenario: '轉折句型' }],
       4: [{ query: '주세요', scenario: '購物與點餐' }, { query: '어디', scenario: '交通與問路' }],
       5: [{ query: '오늘', scenario: '日常對話' }, { query: '약속', scenario: '生活安排' }]
     };
-    let updateInProgress = false;
 
     window.addEventListener('DOMContentLoaded', () => {
       renderTabs();
@@ -315,21 +319,42 @@
 
     function toggleDevModeModal() {
       const modal = document.getElementById('devModal');
-      if (modal.classList.contains('hidden')) {
-        developerMode = true;
-        document.getElementById('developerButton').classList.add('bg-emerald-100', 'text-emerald-700');
+      modal.classList.toggle('hidden');
+      if (!modal.classList.contains('hidden')) updateDeveloperModeUI();
+    }
+
+    function closeDevModeModal() {
+      document.getElementById('devModal').classList.add('hidden');
+    }
+
+    function toggleDeveloperMode() {
+      developerMode = !developerMode;
+      if (!phaseUnlocked(currentPhase)) switchPhase(1);
+      else {
         renderTabs();
         renderStudyStatus();
       }
-      modal.classList.toggle('hidden');
+      updateDeveloperModeUI();
     }
 
-    function disableDeveloperMode() {
-      developerMode = false;
-      document.getElementById('developerButton').classList.remove('bg-emerald-100', 'text-emerald-700');
-      document.getElementById('devModal').classList.add('hidden');
-      if (!phaseUnlocked(currentPhase)) switchPhase(1);
-      else { renderTabs(); renderStudyStatus(); }
+    function updateDeveloperModeUI() {
+      const button = document.getElementById('developerButton');
+      const status = document.getElementById('developerModeStatus');
+      const toggle = document.getElementById('developerModeToggle');
+      button.classList.toggle('bg-emerald-100', developerMode);
+      button.classList.toggle('text-emerald-700', developerMode);
+      button.classList.toggle('border-emerald-500', developerMode);
+      button.classList.toggle('border-transparent', !developerMode);
+      if (status) {
+        status.textContent = developerMode
+          ? '目前開發者模式：已開啟（可略過學習時數直接考試）'
+          : '目前開發者模式：關閉';
+        status.classList.toggle('bg-emerald-50', developerMode);
+        status.classList.toggle('text-emerald-800', developerMode);
+        status.classList.toggle('bg-slate-100', !developerMode);
+        status.classList.toggle('text-slate-700', !developerMode);
+      }
+      if (toggle) toggle.textContent = developerMode ? '關閉開發者模式' : '開啟開發者模式';
     }
 
     function renderTabs() {
@@ -378,15 +403,17 @@
 
       renderContent();
       renderStudyStatus();
+      if ((phaseId === 4 || phaseId === 5) && !hasLoadedOnlineContent[phaseId]) triggerNetworkUpdate();
     }
 
     function startCountdownTimer() {
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(() => {
+        if (currentPhase !== 4 && currentPhase !== 5) return;
         timerSeconds--;
         if (timerSeconds <= 0) {
           timerSeconds = 1800;
-          triggerNetworkUpdate();
+          if (!document.hidden) triggerNetworkUpdate();
         }
         updateTimerDisplay();
       }, 1000);
@@ -449,44 +476,40 @@
     }
 
     async function triggerNetworkUpdate() {
-      if (updateInProgress) return;
-      updateInProgress = true;
+      const phase = currentPhase;
+      if (phase <= 3) {
+        if (selectedExamples[phase] === null) selectExample(phase, 0, false);
+        return updateDailyVocabulary(phase);
+      }
+      if (phase !== 4 && phase !== 5) return;
+      if (phaseUpdateInProgress[phase]) return;
+      phaseUpdateInProgress[phase] = true;
       const spinner = document.getElementById('refreshSpinner');
       const source = document.getElementById('exampleSource');
+      timerSeconds = 1800;
+      updateTimerDisplay();
       spinner.classList.add('fa-spin');
       source.textContent = '更新中';
       try {
-        const results = await Promise.allSettled([fetchDailyExamples(4), fetchDailyExamples(5)]);
-        if (results[0].status === 'fulfilled') {
-          dynamicPhase4Data = results[0].value;
-          phaseNetworkStatus[4] = '線上日常用語 · Tatoeba';
-          phaseNetworkError[4] = '';
-        } else {
-          phaseNetworkStatus[4] = dynamicPhase4Data.length ? '更新失敗 · 顯示上次線上資料' : '更新失敗 · 請重試';
-          phaseNetworkError[4] = networkFailureText(results[0].reason);
-          console.warn('階段 4 線上例句更新失敗：', results[0].reason);
-        }
-        if (results[1].status === 'fulfilled') {
-          dynamicPhase5Data = results[1].value;
-          phaseNetworkStatus[5] = '線上日常用語 · Tatoeba';
-          phaseNetworkError[5] = '';
-        } else {
-          phaseNetworkStatus[5] = dynamicPhase5Data.length ? '更新失敗 · 顯示上次線上資料' : '更新失敗 · 請重試';
-          phaseNetworkError[5] = networkFailureText(results[1].reason);
-          console.warn('階段 5 線上例句更新失敗：', results[1].reason);
-        }
-        if (results.every(result => result.status === 'rejected')) throw new Error('兩個階段皆無法取得例句');
-        exampleSource = results.every(result => result.status === 'fulfilled') ? '線上日常用語 · Tatoeba' : '部分更新失敗 · 請重試';
+        const examples = await fetchDailyExamples(phase);
+        if (phase === 4) dynamicPhase4Data = examples;
+        else dynamicPhase5Data = examples;
+        hasLoadedOnlineContent[phase] = true;
+        phaseNetworkStatus[phase] = '線上日常用語 · Tatoeba';
+        phaseNetworkError[phase] = '';
+        exampleSource = phaseNetworkStatus[phase];
       } catch (error) {
-        exampleSource = '網路更新失敗 · 請重試';
-        console.warn('外部例句更新失敗：', error);
+        phaseNetworkStatus[phase] = (phase === 4 ? dynamicPhase4Data : dynamicPhase5Data).length
+          ? '更新失敗 · 顯示上次線上資料'
+          : '更新失敗 · 請重試';
+        phaseNetworkError[phase] = networkFailureText(error);
+        exampleSource = phaseNetworkStatus[phase];
+        console.warn(`階段 ${phase} 線上例句更新失敗：`, error);
       } finally {
-        source.textContent = currentPhase === 4 || currentPhase === 5 ? phaseNetworkStatus[currentPhase] : exampleSource;
-        spinner.classList.remove('fa-spin');
-        updateInProgress = false;
-        timerSeconds = 1800;
-        updateTimerDisplay();
-        if (currentPhase === 4 || currentPhase === 5) { renderContent(); renderStudyStatus(); }
+        phaseUpdateInProgress[phase] = false;
+        if (!phaseUpdateInProgress[4] && !phaseUpdateInProgress[5]) spinner.classList.remove('fa-spin');
+        if (currentPhase === 4 || currentPhase === 5) source.textContent = phaseNetworkStatus[currentPhase];
+        if (currentPhase === phase) { renderContent(); renderStudyStatus(); }
       }
     }
 
